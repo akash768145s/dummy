@@ -1,45 +1,120 @@
+import questions from "./data.js";
 
-import { questions } from "./data.js";
+let currentQuestion = 0;
+let time = 30;
+let score = 0;
+let gameOver = false;
+let timerInterval;
 
-const Timer = ({ time }) => {
-  return <div className="clock">{time}s</div>;
-};
+const root = document.getElementById("root");
+const toast = document.getElementById("toast");
 
-const Question = ({ data, onAnswerClick }) => {
-  return (
-    <div className="question-container">
-      <img
-        src={data.image_fname}
-        alt="quiz"
-        className="question-image"
-        loading="lazy"
-      />
-      <div className="comic-text-box">
+function startGame() {
+  if (!gameOver) {
+    renderQuestion();
+    startTimer();
+  }
+}
+
+function renderQuestion() {
+  const question = questions[currentQuestion];
+
+  root.innerHTML = `
+    <div class="question-container">
+      <img src="${
+        question.image_fname
+      }" alt="quiz" class="question-image" loading="lazy" />
+      <div class="comic-text-box">
         <h2>இந்த புகைப்படம் பெயர் என்ன?</h2>
-        <div className="complexity-label">
-          கடின நிலை: {getComplexityInTamil(data.complexity)}
-        </div>
-        <div className="option-container">
-          {[data.option1, data.option2, data.option3, data.option4].map(
-            (option, index) => (
-              <button
-                key={index}
-                className="option"
-                onClick={() =>
-                  onAnswerClick(`option${index + 1}`, data.complexity)
-                }
-              >
-                {option}
-              </button>
+        <div class="complexity-label">கடின நிலை: ${getComplexityInTamil(
+          question.complexity
+        )}</div>
+        <div class="option-container">
+          ${[
+            question.option1,
+            question.option2,
+            question.option3,
+            question.option4,
+          ]
+            .map(
+              (option, index) =>
+                `<button class="option" onclick="handleAnswerClick('option${
+                  index + 1
+                }')">${option}</button>`
             )
-          )}
+            .join("")}
         </div>
       </div>
+      <div class="clock">${time}s</div>
     </div>
+  `;
+}
+
+function startTimer() {
+  clearInterval(timerInterval); // Clear any previous timer
+  timerInterval = setInterval(() => {
+    if (time > 0 && !gameOver) {
+      time--;
+      document.querySelector(".clock").innerText = `${time}s`;
+    } else {
+      clearInterval(timerInterval);
+      moveToNextQuestion();
+    }
+  }, 1000);
+}
+
+window.handleAnswerClick = function (option) {
+  const question = questions[currentQuestion];
+  const points = getScoreByComplexity(
+    question.complexity,
+    option === question.correct_option
   );
+  score += points;
+
+  showToast(
+    option === question.correct_option
+      ? `சரியான பதில்! ${points} மதிப்பெண்`
+      : `தவறான பதில்! ${points} மதிப்பெண்`
+  );
+  moveToNextQuestion();
 };
 
-const getComplexityInTamil = (complexity) => {
+function getScoreByComplexity(complexity, correct) {
+  if (complexity === "Easy") return correct ? 1 : 0;
+  if (complexity === "Mid") return correct ? 2 : -1;
+  if (complexity === "Hard") return correct ? 3 : -2;
+  return 0;
+}
+
+function moveToNextQuestion() {
+  if (currentQuestion < questions.length - 1) {
+    currentQuestion++;
+    time = 30; // Reset timer for the next question
+    renderQuestion();
+    startTimer(); // Restart timer for the new question
+  } else {
+    endGame();
+  }
+}
+
+function endGame() {
+  gameOver = true;
+  clearInterval(timerInterval);
+  root.innerHTML = `
+    <div class="comic-text-box">
+      <h2>விளையாட்டு முடிந்தது!</h2>
+      <p>உங்கள் இறுதி மதிப்பெண்: ${score}</p>
+    </div>
+  `;
+}
+
+function showToast(message) {
+  toast.innerText = message;
+  toast.classList.add("show");
+  setTimeout(() => toast.classList.remove("show"), 2000);
+}
+
+function getComplexityInTamil(complexity) {
   switch (complexity) {
     case "Easy":
       return "எளிமை";
@@ -50,90 +125,7 @@ const getComplexityInTamil = (complexity) => {
     default:
       return "";
   }
-};
+}
 
-const App = () => {
-  const [currentQuestion, setCurrentQuestion] = React.useState(0);
-  const [time, setTime] = React.useState(30);
-  const [score, setScore] = React.useState(0);
-  const [gameOver, setGameOver] = React.useState(false);
-  const [toastMessage, setToastMessage] = React.useState("");
-
-  React.useEffect(() => {
-    if (time > 0 && !gameOver) {
-      const interval = setInterval(() => setTime(time - 1), 1000);
-      return () => clearInterval(interval);
-    } else {
-      moveToNextQuestion();
-    }
-  }, [time, gameOver]);
-
-  const handleAnswerClick = (option, complexity) => {
-    let points = 0;
-    if (option === questions[currentQuestion].correct_option) {
-      points = getScoreByComplexity(complexity, true);
-      setScore(score + points);
-      showToastMessage(`சரியான பதில்! ${points} மதிப்பெண்`);
-    } else {
-      points = getScoreByComplexity(complexity, false);
-      setScore(score + points);
-      showToastMessage(`தவறான பதில்! ${points} மதிப்பெண்`);
-    }
-
-    moveToNextQuestion();
-  };
-
-  const getScoreByComplexity = (complexity, correct) => {
-    if (complexity === "Easy") return correct ? 1 : 0;
-    if (complexity === "Mid") return correct ? 2 : -1;
-    if (complexity === "Hard") return correct ? 3 : -2;
-    return 0;
-  };
-
-  const moveToNextQuestion = () => {
-    if (currentQuestion < questions.length - 1) {
-      setCurrentQuestion(currentQuestion + 1);
-      setTime(30);
-    } else {
-      setGameOver(true);
-    }
-  };
-
-  const endGame = () => {
-    // Replace with your API endpoint
-    fetch("https://your-api-endpoint/score", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ score, timestamp: new Date() }),
-    });
-  };
-
-  const showToastMessage = (message) => {
-    setToastMessage(message);
-    const toast = document.querySelector(".toast");
-    toast.classList.add("show");
-    setTimeout(() => toast.classList.remove("show"), 2000);
-  };
-
-  return (
-    <div className="app">
-      {!gameOver && <Timer time={time} />}
-      {questions.length > 0 && !gameOver && (
-        <Question
-          data={questions[currentQuestion]}
-          onAnswerClick={handleAnswerClick}
-        />
-      )}
-      {gameOver && (
-        <div className="comic-text-box">
-          <h2>விளையாட்டு முடிந்தது!</h2>
-          <p>உங்கள் இறுதி மதிப்பெண்: {score}</p>
-          {endGame()}
-        </div>
-      )}
-      <div className="toast">{toastMessage}</div>
-    </div>
-  );
-};
-
-ReactDOM.render(<App />, document.getElementById("root"));
+// Initialize the game
+startGame();

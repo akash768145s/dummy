@@ -1,4 +1,4 @@
-export const questions = [
+const questions = [
   {
     correct_option: "option3",
     option1: "தேம்",
@@ -81,3 +81,5 @@ export const questions = [
     complexity: "Hard",
   },
 ];
+
+export default questions;
